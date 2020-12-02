@@ -1,0 +1,16 @@
+*.s
+semant.o
+semant-phase.o
+handle_flags.o
+seal-lex.o
+seal-parse.o
+utilities.o
+stringtab.o
+dumptype.o
+tree.o
+seal-expr.o
+seal-stmt.o
+semant
+*~
+*.a
+*.o
