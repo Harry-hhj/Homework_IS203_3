@@ -224,9 +224,9 @@ void StmtBlock_class::check(Symbol type) {
 void IfStmt_class::check(Symbol type) {
     if (semant_debug) cout << "---IfStmt_class---" << endl;
 
-    getCondition()->checkType()->get_string();
-    if (getCondition()->checkType() != Bool)
-        semant_error(this) << "Predicate of 'if' does not have type Bool.\n";
+    Symbol conType = getCondition()->checkType();
+    if (!sameType(conType, Bool))
+        semant_error(this) << "Condition must be a Bool, got " << conType->get_string() << ".\n";
 
     getThen()->check(type);
     getElse()->check(type);
@@ -235,17 +235,30 @@ void IfStmt_class::check(Symbol type) {
 void WhileStmt_class::check(Symbol type) {
     if (semant_debug) cout << "---WhileStmt_class---" << endl;
 
-    objectEnv.enterscope();
-
-    objectEnv.exitscope();
+    // ToDO
+    Symbol conType = getCondition()->checkType();
+    if (!sameType(conType, Bool))
+        semant_error(this) << "Condition must be a Bool, got " << conType->get_string() << ".\n";
+    getBody()->check(type);
 }
 
 void ForStmt_class::check(Symbol type) {
     if (semant_debug) cout << "---ForStmt_class---" << endl;
 
-    objectEnv.enterscope();
-
-    objectEnv.exitscope();
+    // TODO
+    if (!getInit()->is_empty_Expr()) {
+        getInit()->checkType();
+    }
+    if (!getCondition()->is_empty_Expr()) {
+        Symbol conType = getCondition()->checkType();
+        if (!sameType(conType, Bool)) {
+            semant_error(this) << "Condition must be a Bool, got " << conType->get_string() << ".\n";
+        }
+    }
+    if (!getLoop()->is_empty_Expr()) {
+        getLoop()->checkType();
+    }
+    getBody()->check(type);
 }
 
 void ReturnStmt_class::check(Symbol type) {
@@ -274,13 +287,13 @@ Symbol Call_class::checkType(){
     if (semant_debug) cout << "---Call_class---" << name << endl;
 
     if (callTable.find(name) == callTable.end()){
-        if (strcmp(name->get_string(), "printf")){
+        if (strcmp(name->get_string(), print->get_string())==0) {
             if (!sameType(actuals->nth(0)->checkType(), String)){
-                semant_error(this) << "the first of print should be string" << endl;
+                semant_error(this) << "the first of print should be string." << endl;
             }
             return Void;
         }
-        semant_error() << "noname" <<endl;
+        semant_error(this) << "noname" <<endl;
         return Void;
     }
 
@@ -316,33 +329,41 @@ Symbol Assign_class::checkType(){ // expr
 
     Symbol actualType = value->checkType();
     Symbol expectedType = *(objectEnv.lookup(lvalue));
-//    semant_error() << "actualType:" <<actualType->get_string() << endl;
     if (!sameType(expectedType, actualType)) {
         semant_error(this) << "Right value must have type " << expectedType->get_string() << " , got " << actualType->get_string() << ".\n";
     }
+    if (sameType(expectedType, String) && false) {
+        semant_error(this) << "Left value can not be String.\n";
+    }
+    setType(expectedType);
     return expectedType;
 }
 
-Symbol Add_class::checkType(){
+Symbol Add_class::checkType(){ // +
     if (semant_debug) cout << "---Add_class---" << endl;
 
     Symbol type1 = e1->checkType();
     Symbol type2 = e2->checkType();
 
     if ((!sameType(type1, Int) && !sameType(type1, Float)) || (!sameType(type2, Int) && !sameType(type2, Float))) {
-        semant_error(this) << "Cannot compare a " << type1->get_string() << " and a " << type2->get_string() << ".\n";
+        semant_error(this) << "Cannot add a " << type1->get_string() << " and a " << type2->get_string() << ".\n";
         if (semant_debug) cout << "---Add_class---type---Void" << endl;
         setType(Void);
         return Void;
     }
+    else if (sameType(type1, Int) && sameType(type2, Int)) {
+        if (semant_debug) cout << "---Add_class---type---Int" << endl;
+        setType(Int);
+        return Int;
+    }
     else {
-        if (semant_debug) cout << "---Add_class---type---Bool" << endl;
-        setType(Bool);
-        return Bool;
+        if (semant_debug) cout << "---Add_class---type---Float" << endl;
+        setType(Float);
+        return Float;
     }
 }
 
-Symbol Minus_class::checkType(){
+Symbol Minus_class::checkType(){ // -
     if (semant_debug) cout << "---Minus_class---" << endl;
 
     Symbol type1 = e1->checkType();
@@ -354,14 +375,19 @@ Symbol Minus_class::checkType(){
         setType(Void);
         return Void;
     }
+    else if (sameType(type1, Int) && sameType(type2, Int)) {
+        if (semant_debug) cout << "---Minus_class---type---Int" << endl;
+        setType(Int);
+        return Int;
+    }
     else {
-        if (semant_debug) cout << "---Minus_class---type---Bool" << endl;
-        setType(Bool);
-        return Bool;
+        if (semant_debug) cout << "---Minus_class---type---Float" << endl;
+        setType(Float);
+        return Float;
     }
 }
 
-Symbol Multi_class::checkType(){
+Symbol Multi_class::checkType(){ // *
     if (semant_debug) cout << "---Multi_class---" << endl;
 
     Symbol type1 = e1->checkType();
@@ -373,14 +399,19 @@ Symbol Multi_class::checkType(){
         setType(Void);
         return Void;
     }
+    else if (sameType(type1, Int) && sameType(type2, Int)) {
+        if (semant_debug) cout << "---Multi_class---type---Int" << endl;
+        setType(Int);
+        return Int;
+    }
     else {
-        if (semant_debug) cout << "---Multi_class---type---Bool" << endl;
-        setType(Bool);
-        return Bool;
+        if (semant_debug) cout << "---Multi_class---type---Float" << endl;
+        setType(Float);
+        return Float;
     }
 }
 
-Symbol Divide_class::checkType(){
+Symbol Divide_class::checkType(){ // /
     if (semant_debug) cout << "---Divide_class---" << endl;
 
     Symbol type1 = e1->checkType();
@@ -392,10 +423,15 @@ Symbol Divide_class::checkType(){
         setType(Void);
         return Void;
     }
+    else if (sameType(type1, Int) && sameType(type2, Int)) {
+        if (semant_debug) cout << "---Divide_class---type---Int" << endl;
+        setType(Int);
+        return Int;
+    }
     else {
-        if (semant_debug) cout << "---Divide_class---type---Bool" << endl;
-        setType(Bool);
-        return Bool;
+        if (semant_debug) cout << "---Divide_class---type---Float" << endl;
+        setType(Float);
+        return Float;
     }
 }
 
@@ -430,9 +466,9 @@ Symbol Neg_class::checkType(){ // -
         return Void;
     }
     else {
-        if (semant_debug) cout << "---Neg_class---type---Bool" << endl;
-        setType(Bool);
-        return Bool;
+        if (semant_debug) cout << "---Neg_class---type---" << type1->get_string() << endl;
+        setType(type1);
+        return type1;
     }
 }
 
@@ -550,7 +586,7 @@ Symbol Gt_class::checkType(){ // >
     }
 }
 
-Symbol And_class::checkType(){
+Symbol And_class::checkType(){ // &&
     if (semant_debug) cout << "---And_class---" << endl;
 
     Symbol type1 = e1->checkType();
@@ -567,7 +603,7 @@ Symbol And_class::checkType(){
     }
 }
 
-Symbol Or_class::checkType(){
+Symbol Or_class::checkType(){ // ||
     if (semant_debug) cout << "---Or_class---" << endl;
 
     Symbol type1 = e1->checkType();
@@ -584,24 +620,28 @@ Symbol Or_class::checkType(){
     }
 }
 
-Symbol Xor_class::checkType(){
+Symbol Xor_class::checkType(){ // ^
     if (semant_debug) cout << "---Xor_class---" << endl;
 
     Symbol type1 = e1->checkType();
     Symbol type2 = e2->checkType();
 
-    if (!sameType(type1, Bool) || !sameType(type2, Bool)) {
+    if (!(sameType(type1, Bool) && sameType(type2, Bool)) || !(sameType(type1, Int) && sameType(type2, Int))) {
         semant_error(this) << "Cannot use ^ between " << type1->get_string() << " and " << type2->get_string() << ".\n";
         setType(Void);
         return Void;
     }
-    else {
+    else if (sameType(type1, Bool)){
         setType(Bool);
         return Bool;
     }
+    else {
+        setType(Int);
+        return Int;
+    }
 }
 
-Symbol Not_class::checkType(){
+Symbol Not_class::checkType(){ // !
     if (semant_debug) cout << "---Not_class---" << endl;
 
     Symbol type1 = e1->checkType();
@@ -616,7 +656,7 @@ Symbol Not_class::checkType(){
     }
 }
 
-Symbol Bitand_class::checkType(){
+Symbol Bitand_class::checkType(){ // &
     if (semant_debug) cout << "---Bitand_class---" << endl;
 
     Symbol type1 = e1->checkType();
@@ -628,8 +668,8 @@ Symbol Bitand_class::checkType(){
         return Void;
     }
     else {
-        setType(Bool);
-        return Bool;
+        setType(Int);
+        return Int;
     }
 }
 
@@ -645,8 +685,8 @@ Symbol Bitor_class::checkType(){
         return Void;
     }
     else {
-        setType(Bool);
-        return Bool;
+        setType(Int);
+        return Int;
     }
 }
 
@@ -661,8 +701,8 @@ Symbol Bitnot_class::checkType(){
         return Void;
     }
     else {
-        setType(Bool);
-        return Bool;
+        setType(Int);
+        return Int;
     }
 }
 
@@ -691,10 +731,13 @@ Symbol Object_class::checkType(){
 
     if (!objectEnv.lookup(var)) {
         semant_error(this) << "object " << var << " has not been defined.\n";
+        setType(Void);
         return Void;
     }
-    else
+    else {
+        setType(*(objectEnv.lookup(var)));
         return *(objectEnv.lookup(var));
+    }
 }
 
 Symbol No_expr_class::checkType(){
@@ -703,7 +746,7 @@ Symbol No_expr_class::checkType(){
 }
 
 void Program_class::semant() {
-    semant_debug = 1;
+    semant_debug = 0;
     initialize_constants();
     install_calls(decls);
     check_main();
