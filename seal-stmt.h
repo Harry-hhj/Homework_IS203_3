@@ -11,64 +11,67 @@ protected:
     Decls decls;
 public:
     Program_class(Decls a1) {
-       decls = a1;
+        decls = a1;
     }
     Program copy_Program();
-	tree_node *copy()		 { return copy_Program(); }
+    tree_node *copy()		 { return copy_Program(); }
     void dump(ostream& stream, int n);
     void dump_with_types(ostream&, int);
 
-	void semant();
-	// for semantic analysis
+    void semant();
+    // for semantic analysis
 };
 
 
 class Stmt_class : public tree_node {
 public:
-	tree_node *copy()		 { return copy_Stmt(); }
-	virtual Stmt copy_Stmt() = 0;
-	virtual void dump_with_types(ostream&,int) = 0; 
-	virtual void dump(ostream&,int) = 0;
-	virtual void check(Symbol) = 0;
+    tree_node *copy()		 { return copy_Stmt(); }
+    virtual Stmt copy_Stmt() = 0;
+    virtual void dump_with_types(ostream&,int) = 0;
+    virtual void dump(ostream&,int) = 0;
+    virtual void check(Symbol) = 0;
+    virtual bool isReturn() {return false;}
 };
 
 class StmtBlock_class : public Stmt_class {
 protected:
-	 VariableDecls vars;
-	 Stmts	stmts;
+    VariableDecls vars;
+    Stmts	stmts;
 public:
-	StmtBlock_class(VariableDecls a1, Stmts a2) {
-		vars = a1;
-	    stmts = a2;
-	}
-	Stmt copy_Stmt(){return copy_StmtBlock();}
-	Stmts getStmts(){return stmts;}
+    StmtBlock_class(VariableDecls a1, Stmts a2) {
+        vars = a1;
+        stmts = a2;
+    }
+    Stmt copy_Stmt(){return copy_StmtBlock();}
+    Stmts getStmts(){return stmts;}
 
-	VariableDecls getVariableDecls(){return vars;};
-	StmtBlock copy_StmtBlock();
-	void check(Symbol);
-	void dump(ostream& , int );
-	void dump_with_types(ostream&,int);
+    VariableDecls getVariableDecls(){return vars;};
+    StmtBlock copy_StmtBlock();
+    void check(Symbol);
+    void dump(ostream& , int );
+    void dump_with_types(ostream&,int);
+    bool isReturn() {return false;}
 };
 
 class IfStmt_class : public Stmt_class {
 protected:
-    protected:
-	Expr condition;
-	StmtBlock thenexpr, elseexpr;
+protected:
+    Expr condition;
+    StmtBlock thenexpr, elseexpr;
 public:
     IfStmt_class(Expr a1, StmtBlock a2, StmtBlock a3) {
-		condition = a1;
-		thenexpr = a2;
-		elseexpr = a3;
-	}
-	Expr getCondition(){return condition;}
-	StmtBlock getThen(){return thenexpr;}
-	StmtBlock getElse(){return elseexpr;}
+        condition = a1;
+        thenexpr = a2;
+        elseexpr = a3;
+    }
+    Expr getCondition(){return condition;}
+    StmtBlock getThen(){return thenexpr;}
+    StmtBlock getElse(){return elseexpr;}
     Stmt copy_Stmt();
-	void check(Symbol);
-	void dump(ostream& stream, int n);
-	void dump_with_types(ostream&,int);
+    void check(Symbol);
+    void dump(ostream& stream, int n);
+    void dump_with_types(ostream&,int);
+    bool isReturn() {return false;}
 };
 
 
@@ -76,40 +79,42 @@ typedef class WhileStmt_class *WhileStmt;
 
 class WhileStmt_class : public Stmt_class {
 protected:
-	Expr condition;
-	StmtBlock body;
+    Expr condition;
+    StmtBlock body;
 public:
     WhileStmt_class(Expr a1, StmtBlock a2) {
-		condition = a1;
-		body = a2;
-	}
-	Expr getCondition(){return condition;}
-	StmtBlock getBody(){return body;}
+        condition = a1;
+        body = a2;
+    }
+    Expr getCondition(){return condition;}
+    StmtBlock getBody(){return body;}
     Stmt copy_Stmt();
-	void check(Symbol);
-	void dump(ostream& stream, int n);
-	void dump_with_types(ostream&,int);
+    void check(Symbol);
+    void dump(ostream& stream, int n);
+    void dump_with_types(ostream&,int);
+    bool isReturn() {return false;}
 };
 
 class ForStmt_class : public Stmt_class {
 protected:
-	Expr initexpr, condition, loopact;
-	StmtBlock body;
+    Expr initexpr, condition, loopact;
+    StmtBlock body;
 public:
-	ForStmt_class(Expr a1, Expr a2, Expr a3, StmtBlock a4) {
-		initexpr = a1;
-		condition = a2;
-		loopact = a3;
-		body = a4;
-	}
-	Expr getInit(){return initexpr;}
-	Expr getCondition(){return condition;}
-	Expr getLoop(){return loopact;}
-	StmtBlock getBody(){return body;}
-	void check(Symbol);
+    ForStmt_class(Expr a1, Expr a2, Expr a3, StmtBlock a4) {
+        initexpr = a1;
+        condition = a2;
+        loopact = a3;
+        body = a4;
+    }
+    Expr getInit(){return initexpr;}
+    Expr getCondition(){return condition;}
+    Expr getLoop(){return loopact;}
+    StmtBlock getBody(){return body;}
+    void check(Symbol);
     Stmt copy_Stmt();
-	void dump(ostream& stream, int n);
-	void dump_with_types(ostream&,int);
+    void dump(ostream& stream, int n);
+    void dump_with_types(ostream&,int);
+    bool isReturn() {return false;}
 };
 
 
@@ -118,33 +123,36 @@ class ReturnStmt_class : public Stmt_class {
 protected:
     Expr value;
 public:
-	ReturnStmt_class(Expr a2) {
+    ReturnStmt_class(Expr a2) {
         value = a2;
     }
-	Expr getValue(){return value;}
+    Expr getValue(){return value;}
     Stmt copy_Stmt();
-	void check(Symbol);
+    void check(Symbol);
     void dump_with_types(ostream&,int);
     void dump(ostream& stream, int n);
+    bool isReturn() {return true;}
 };
 
 class ContinueStmt_class : public Stmt_class {
 public:
-	ContinueStmt_class() {}
+    ContinueStmt_class() {}
     Stmt copy_Stmt();
-	void check(Symbol);
+    void check(Symbol);
     void dump_with_types(ostream&,int);
     void dump(ostream& stream, int n);
+    bool isReturn() {return false;}
 };
 
 
 class BreakStmt_class : public Stmt_class {
 public:
-	BreakStmt_class() {}
+    BreakStmt_class() {}
     Stmt copy_Stmt();
-	void check(Symbol);
+    void check(Symbol);
     void dump_with_types(ostream&,int);
     void dump(ostream& stream, int n);
+    bool isReturn() {return false;}
 };
 
 typedef class Program_class *Program;

@@ -14,3 +14,5 @@ semant
 *~
 *.a
 *.o
+testFile
+output*

@@ -8,9 +8,9 @@ int main(int argc, char *argv[]) {
   //
 
   SymbolTable<char *,int> *map = new SymbolTable<char *, int>();
-  char *Fred = "Fred";
-  char *Mary = "Mary";
-  char *Miguel = "Miguel";
+  char *Fred = static_cast<char*>("Fred");
+  char *Mary = static_cast<char*>("Mary");
+  char *Miguel = static_cast<char*>("Miguel");
 
   // enter a scope; required before any symbols can be added
   map->enterscope();
