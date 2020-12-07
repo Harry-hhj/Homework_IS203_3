@@ -11,7 +11,6 @@ static ostream& error_stream = cerr;
 static int semant_errors = 0;
 static Decl curr_decl = 0;
 
-static bool inloop = false; // TODO: for while =1; iscontinue/isbreak && inloop==0 is wrong
 static std::vector<bool> inloops;
 
 typedef SymbolTable<Symbol, Symbol> ObjectEnvironment; // name, type
@@ -133,7 +132,7 @@ static void install_globalVars(Decls decls) {
         }
     }
     if (semant_debug) {
-        std::cout << "Debug msg: Install " << cnt << "globalVarDecls.\n" << std::endl;
+        cout << "Debug msg: Install " << cnt << "globalVarDecls.\n" << endl;
     }
 }
 
@@ -163,12 +162,12 @@ static void check_main() {
 }
 
 void VariableDecl_class::check() {
-    if (semant_debug) cout << "---VariableDecl_class---" << getName() << endl;
+    if (semant_debug) cout << "---VariableDecl_class---" << getName()->get_string() << endl;
 
     if (!isValidTypeName(variable->getType()))
-        semant_error(this) << "var " << variable->getName() << " cannot be of type Void. Void can just be used as return type.\n";
+        semant_error(this) << "var " << variable->getName()->get_string() << " cannot be of type Void. Void can just be used as return type.\n";
     else if (objectEnv.probe(variable->getName()) != NULL)
-        semant_error(this) << "redifined.";
+        semant_error(this) << "var " << variable->getName()->get_string() << " was previously defined.\n";
     else
         objectEnv.addid(getName(), new Symbol(getType()));
 }
@@ -186,11 +185,11 @@ void CallDecl_class::check() {
         if (semant_debug) cout << "---CallDecl_class---param_name---" << param->getName() << endl;
         bool flag1 = true, flag2 = true;
         if (param->getType() == Void) {
-            semant_error(this) << "Function " << getName() << " 's parameter has an invalid type Void.\n";
+            semant_error(this) << "Function " << getName()->get_string() << " 's parameter has an invalid type Void.\n";
             flag1 = false;
         }
         if (objectEnv.probe(param->getName()) != NULL && *(objectEnv.probe(param->getName())) == param->getType()) {
-            semant_error(this) << "Function " << getName() << " 's parameter has a duplicate name " << param->getName() << ".\n";
+            semant_error(this) << "Function " << getName()->get_string() << " 's parameter has a duplicate name " << param->getName() << ".\n";
             flag2 = false;
         }
         if (flag1 && flag2)
@@ -198,6 +197,16 @@ void CallDecl_class::check() {
     }
 
     getBody()->check(getType());
+
+    //TODO:return
+    bool hasReturn = false;
+    Stmts stmts = getBody()->getStmts();
+    for (int i = stmts->first(); stmts->more(i); i = stmts->next(i)) {
+        hasReturn = hasReturn | stmts->nth(i)->isReturn();
+        if (hasReturn) break;
+    }
+    if (!hasReturn)
+        semant_error(this) << "Function " << getName()->get_string() << " must have an overall return statement.\n";
 
     objectEnv.exitscope();
 }
