@@ -12,6 +12,7 @@ static int semant_errors = 0;
 static Decl curr_decl = 0;
 
 static bool inloop = false; // TODO: for while =1; iscontinue/isbreak && inloop==0 is wrong
+static std::vector<bool> inloops;
 
 typedef SymbolTable<Symbol, Symbol> ObjectEnvironment; // name, type
 ObjectEnvironment objectEnv;
@@ -235,17 +236,21 @@ void IfStmt_class::check(Symbol type) {
 void WhileStmt_class::check(Symbol type) {
     if (semant_debug) cout << "---WhileStmt_class---" << endl;
 
-    // ToDO
+    inloops.push_back(true);
+    if (semant_debug) cout << "while add inloop ,remaining " << inloops.size() << endl;
     Symbol conType = getCondition()->checkType();
     if (!sameType(conType, Bool))
         semant_error(this) << "Condition must be a Bool, got " << conType->get_string() << ".\n";
     getBody()->check(type);
+    inloops.pop_back();
+    if (semant_debug) cout << "while pop inloop ,remaining " << inloops.size() << endl;
 }
 
 void ForStmt_class::check(Symbol type) {
     if (semant_debug) cout << "---ForStmt_class---" << endl;
 
-    // TODO
+    inloops.push_back(true);
+    if (semant_debug) cout << "for add inloop ,remaining " << inloops.size() << endl;
     if (!getInit()->is_empty_Expr()) {
         getInit()->checkType();
     }
@@ -259,6 +264,8 @@ void ForStmt_class::check(Symbol type) {
         getLoop()->checkType();
     }
     getBody()->check(type);
+    inloops.pop_back();
+    if (semant_debug) cout << "for pop inloop ,remaining " << inloops.size() << endl;
 }
 
 void ReturnStmt_class::check(Symbol type) {
@@ -272,15 +279,16 @@ void ReturnStmt_class::check(Symbol type) {
 void ContinueStmt_class::check(Symbol type) {
     if (semant_debug) cout << "---ContinueStmt_class---" << endl;
 
-    if (!inloop)
-        semant_error(this) << "continue not in loop.\n";
+    if (inloops.empty())
+        semant_error(this) << "continue must be used in a loop sentence.\n";
 }
 
 void BreakStmt_class::check(Symbol type) {
     if (semant_debug) cout << "---BreakStmt_class---" << endl;
 
-    if (!inloop)
-        semant_error(this) << "break not in loop.\n";
+    if (inloops.empty()) {
+        semant_error(this) << "break must be used in a loop sentence.\n";
+    }
 }
 
 Symbol Call_class::checkType(){
@@ -291,9 +299,11 @@ Symbol Call_class::checkType(){
             if (!sameType(actuals->nth(0)->checkType(), String)){
                 semant_error(this) << "the first of print should be string." << endl;
             }
+            setType(Void);
             return Void;
         }
         semant_error(this) << "noname" <<endl;
+        setType(Void);
         return Void;
     }
 
@@ -301,6 +311,7 @@ Symbol Call_class::checkType(){
     Actuals actuals1 = actuals;
     if (variables1->len() != actuals1->len()) {
         semant_error(this) << "Function " << name << " called with wrong number of arguments.\n";
+        setType(callTable[name]->getType());
         return callTable[name]->getType();
     }
     for (int i = variables1->first(); variables1->more(i); i = variables1->next(i)) {
@@ -308,6 +319,7 @@ Symbol Call_class::checkType(){
             semant_error(this) << "Function " << name << " , the " << i << " parameter should be " << variables1->nth(i)->getType() << " but provided a " << actuals1->nth(i)->getType() << ".\n";
     }
     if (semant_debug) cout << "---callTable[name]->getType():" << callTable[name]->getType()->get_string() << endl;
+    setType(callTable[name]->getType());
     return callTable[name]->getType();
 }
 
