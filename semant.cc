@@ -11,7 +11,7 @@ static ostream& error_stream = cerr;
 static int semant_errors = 0;
 static Decl curr_decl = 0;
 
-static std::vector<bool> inloops;
+static int inloop = 0;
 
 typedef SymbolTable<Symbol, Symbol> ObjectEnvironment; // name, type
 ObjectEnvironment objectEnv;
@@ -125,6 +125,9 @@ static void install_globalVars(Decls decls) {
             VariableDecl variableDecl = static_cast<VariableDecl>(tmp_decl);
             if (objectEnv.lookup(variableDecl->getName()) != NULL)
                 semant_error(variableDecl) << "var " << variableDecl->getName()->get_string() << " was previously defined.\n";
+            else if (sameType(tmp_decl->getType(), Void)) {
+                semant_error(tmp_decl) << "var " << tmp_decl->getName()->get_string() << " cannot be of type Void. Void can just be used as return type.\n";
+            }
             else {
                 objectEnv.addid(variableDecl->getName(), new Symbol(variableDecl->getType()));
                 ++cnt;
@@ -164,10 +167,10 @@ static void check_main() {
 void VariableDecl_class::check() {
     if (semant_debug) cout << "---VariableDecl_class---" << getName()->get_string() << endl;
 
-    if (!isValidTypeName(variable->getType()))
-        semant_error(this) << "var " << variable->getName()->get_string() << " cannot be of type Void. Void can just be used as return type.\n";
-    else if (objectEnv.probe(variable->getName()) != NULL)
+    if (objectEnv.probe(variable->getName()) != NULL)
         semant_error(this) << "var " << variable->getName()->get_string() << " was previously defined.\n";
+    else if (!isValidTypeName(variable->getType()))
+        semant_error(this) << "var " << variable->getName()->get_string() << " cannot be of type Void. Void can just be used as return type.\n";
     else
         objectEnv.addid(getName(), new Symbol(getType()));
 }
@@ -188,7 +191,7 @@ void CallDecl_class::check() {
             semant_error(this) << "Function " << getName()->get_string() << " 's parameter has an invalid type Void.\n";
             flag1 = false;
         }
-        if (objectEnv.probe(param->getName()) != NULL && *(objectEnv.probe(param->getName())) == param->getType()) {
+        else if (objectEnv.probe(param->getName()) != NULL) {
             semant_error(this) << "Function " << getName()->get_string() << " 's parameter has a duplicate name " << param->getName() << ".\n";
             flag2 = false;
         }
@@ -246,21 +249,21 @@ void IfStmt_class::check(Symbol type) {
 void WhileStmt_class::check(Symbol type) {
     if (semant_debug) cout << "---WhileStmt_class---" << endl;
 
-    inloops.push_back(true);
-    if (semant_debug) cout << "while push inloop ,remaining " << inloops.size() << endl;
+    ++inloop;
+    if (semant_debug) cout << "while push inloop ,remaining " << inloop << endl;
     Symbol conType = getCondition()->checkType();
     if (!sameType(conType, Bool))
         semant_error(this) << "Condition must be a Bool, got " << conType->get_string() << ".\n";
     getBody()->check(type);
-    inloops.pop_back();
-    if (semant_debug) cout << "while pop inloop ,remaining " << inloops.size() << endl;
+    --inloop;
+    if (semant_debug) cout << "while pop inloop ,remaining " << inloop << endl;
 }
 
 void ForStmt_class::check(Symbol type) {
     if (semant_debug) cout << "---ForStmt_class---" << endl;
 
-    inloops.push_back(true);
-    if (semant_debug) cout << "for push inloop ,remaining " << inloops.size() << endl;
+    ++inloop;
+    if (semant_debug) cout << "for push inloop ,remaining " << inloop << endl;
     if (!getInit()->is_empty_Expr()) {
         getInit()->checkType();
     }
@@ -274,8 +277,8 @@ void ForStmt_class::check(Symbol type) {
         }
     }
     getBody()->check(type);
-    inloops.pop_back();
-    if (semant_debug) cout << "for pop inloop ,remaining " << inloops.size() << endl;
+    --inloop;
+    if (semant_debug) cout << "for pop inloop ,remaining " << inloop << endl;
 }
 
 void ReturnStmt_class::check(Symbol type) {
@@ -289,14 +292,14 @@ void ReturnStmt_class::check(Symbol type) {
 void ContinueStmt_class::check(Symbol type) {
     if (semant_debug) cout << "---ContinueStmt_class---" << endl;
 
-    if (inloops.empty())
+    if (inloop == 0)
         semant_error(this) << "continue must be used in a loop sentence.\n";
 }
 
 void BreakStmt_class::check(Symbol type) {
     if (semant_debug) cout << "---BreakStmt_class---" << endl;
 
-    if (inloops.empty()) {
+    if (inloop == 0) {
         semant_error(this) << "break must be used in a loop sentence.\n";
     }
 }
@@ -306,8 +309,18 @@ Symbol Call_class::checkType(){
 
     if (callTable.find(getName()) == callTable.end()){
         if (strcmp(getName()->get_string(), print->get_string())==0) {
-            if (!sameType(getActuals()->nth(0)->checkType(), String)){
-                semant_error(this) << "printf()'s first parameter must be of type String.\n";
+            Actuals actuals = getActuals();
+            if (actuals->len() == 0) {
+                semant_error(this) << "printf() must has at last one parameter of type String.\n";
+            }
+            else {
+                for (int i = actuals->first(); actuals->more(i); i = actuals->next(i)){
+                    Symbol actualType = actuals->nth(i)->checkType();
+                    if (i == actuals->first()) {
+                        if (!sameType(actualType, String))
+                            semant_error(this) << "printf()'s first parameter must be of type String.\n";
+                    }
+                }
             }
             setType(Void);
             return Void;
@@ -326,7 +339,7 @@ Symbol Call_class::checkType(){
     }
     for (int i = variables1->first(); variables1->more(i); i = variables1->next(i)) {
         if (variables1->nth(i)->getType() != actuals1->nth(i)->checkType())
-            semant_error(this) << "Function " << getName()->get_string()<< " , the " << i << " parameter should be " << variables1->nth(i)->getType()->get_string() << " but provided a " << actuals1->nth(i)->getType()->get_string() << ".\n";
+            semant_error(this) << "Function " << getName()->get_string()<< " , the " << i+1 << " parameter should be " << variables1->nth(i)->getType()->get_string() << " but provided a " << actuals1->nth(i)->getType()->get_string() << ".\n";
     }
     if (semant_debug) cout << "---callTable[name]->getType():" << callTable[getName()]->getType()->get_string() << endl;
     setType(callTable[getName()]->getType());
@@ -354,9 +367,9 @@ Symbol Assign_class::checkType(){ // expr
     if (!sameType(expectedType, actualType)) {
         semant_error(this) << "Right value must have type " << expectedType->get_string() << " , got " << actualType->get_string() << ".\n";
     }
-    if (sameType(expectedType, String)) {
-        semant_error(this) << "Left value can not be String.\n";
-    }
+//    if (sameType(expectedType, String)) {
+//        semant_error(this) << "Left value can not be String.\n";
+//    }
     setType(expectedType);
     return expectedType;
 }
@@ -392,7 +405,7 @@ Symbol Minus_class::checkType(){ // -
     Symbol type2 = e2->checkType();
 
     if ((!sameType(type1, Int) && !sameType(type1, Float)) || (!sameType(type2, Int) && !sameType(type2, Float))) {
-        semant_error(this) << "Cannot compare a " << type1->get_string() << " and a " << type2->get_string() << ".\n";
+        semant_error(this) << "Cannot minus a " << type1->get_string() << " and a " << type2->get_string() << ".\n";
         if (semant_debug) cout << "---Minus_class---type---Void" << endl;
         setType(Void);
         return Void;
@@ -416,7 +429,7 @@ Symbol Multi_class::checkType(){ // *
     Symbol type2 = e2->checkType();
 
     if ((!sameType(type1, Int) && !sameType(type1, Float)) || (!sameType(type2, Int) && !sameType(type2, Float))) {
-        semant_error(this) << "Cannot compare a " << type1->get_string() << " and a " << type2->get_string() << ".\n";
+        semant_error(this) << "Cannot multi a " << type1->get_string() << " and a " << type2->get_string() << ".\n";
         if (semant_debug) cout << "---Multi_class---type---Void" << endl;
         setType(Void);
         return Void;
@@ -440,7 +453,7 @@ Symbol Divide_class::checkType(){ // /
     Symbol type2 = e2->checkType();
 
     if ((!sameType(type1, Int) && !sameType(type1, Float)) || (!sameType(type2, Int) && !sameType(type2, Float))) {
-        semant_error(this) << "Cannot compare a " << type1->get_string() << " and a " << type2->get_string() << ".\n";
+        semant_error(this) << "Cannot div a " << type1->get_string() << " and a " << type2->get_string() << ".\n";
         if (semant_debug) cout << "---Divide_class---type---Void" << endl;
         setType(Void);
         return Void;
@@ -463,7 +476,7 @@ Symbol Mod_class::checkType(){ // %
     Symbol type1 = e1->checkType();
     Symbol type2 = e2->checkType();
 
-    if (!sameType(type1, Int)|| !sameType(type2, Int)) {
+    if (!sameType(type1, Int) || !sameType(type2, Int)) {
         semant_error(this) << "Cannot mod a " << type1->get_string() << " and a " << type2->get_string() << ".\n";
         if (semant_debug) cout << "---Mod_class---type---Void" << endl;
         setType(Void);
@@ -471,8 +484,8 @@ Symbol Mod_class::checkType(){ // %
     }
     else {
         if (semant_debug) cout << "---Mod_class---type---Bool" << endl;
-        setType(Bool);
-        return Bool;
+        setType(Int);
+        return Int;
     }
 }
 
@@ -538,7 +551,10 @@ Symbol Equ_class::checkType(){ // ==
     Symbol type1 = e1->checkType();
     Symbol type2 = e2->checkType();
 
-    if ((!sameType(type1, Int) && !sameType(type1, Float) && !sameType(type1, Bool)) || (!sameType(type2, Int) && !sameType(type2, Float) && !sameType(type2, Bool))) {
+    if ((sameType(type1, Int) && !sameType(type2, Int) && !sameType(type2, Float)) ||
+        (sameType(type1, Float) && !sameType(type2, Float) && !sameType(type2, Int)) ||
+        (sameType(type1, Bool) && !sameType(type2, Bool)) ||
+        sameType(type1, String)) {
         semant_error(this) << "Cannot compare a " << type1->get_string() << " and a " << type2->get_string() << ".\n";
         if (semant_debug) cout << "---Equ_class---type---Void" << endl;
         setType(Void);
@@ -550,14 +566,17 @@ Symbol Equ_class::checkType(){ // ==
         return Bool;
     }
 }
-
+//TODO:&&
 Symbol Neq_class::checkType(){ // !=
     if (semant_debug) cout << "---Neq_class---" << endl;
 
     Symbol type1 = e1->checkType();
     Symbol type2 = e2->checkType();
 
-    if ((!sameType(type1, Int) && !sameType(type1, Float) && !sameType(type1, Bool)) || (!sameType(type2, Int) && !sameType(type2, Float) && !sameType(type2, Bool))) {
+    if ((sameType(type1, Int) && !sameType(type2, Int) && !sameType(type2, Float)) ||
+        (sameType(type1, Float) && !sameType(type2, Float) && !sameType(type2, Int)) ||
+        (sameType(type1, Bool) && !sameType(type2, Bool)) ||
+        sameType(type1, String)) {
         semant_error(this) << "Cannot compare a " << type1->get_string() << " and a " << type2->get_string() << ".\n";
         if (semant_debug) cout << "---Neq_class---type---Void" << endl;
         setType(Void);
@@ -648,7 +667,7 @@ Symbol Xor_class::checkType(){ // ^
     Symbol type1 = e1->checkType();
     Symbol type2 = e2->checkType();
 
-    if (!(sameType(type1, Bool) && sameType(type2, Bool)) || !(sameType(type1, Int) && sameType(type2, Int))) {
+    if (!(sameType(type1, Bool) && sameType(type2, Bool)) && !(sameType(type1, Int) && sameType(type2, Int))) {
         semant_error(this) << "Cannot use ^ between " << type1->get_string() << " and " << type2->get_string() << ".\n";
         setType(Void);
         return Void;

@@ -1,8 +1,8 @@
 #!/bin/bash
 filename=$1
 echo "--------Make---------"
-make clean
-make
+#make clean
+make -j4
 echo "--------Test using" $filename "--------"
 ./semant $filename > output.txt
 echo
