@@ -136,7 +136,7 @@ static void install_globalVars(Decls decls) {
     }
 }
 
-static void check_calls(Decls decls) {
+static void check_calls() {
     if (semant_debug) cout << "---check_calls---" << endl;
     for (CallTable::iterator it = callTable.begin(); it != callTable.end(); it++) {
         it->second->check();
@@ -173,7 +173,7 @@ void VariableDecl_class::check() {
 }
 
 void CallDecl_class::check() {
-    if (semant_debug) cout << "---CallDecl_class::check---" << this->getName() << endl;
+    if (semant_debug) cout << "---CallDecl_class::check---" << getName()->get_string() << endl;
 
     if (!isValidCallName(getType()))
         semant_error(this) << "ReturnType can not be print.\n";
@@ -182,7 +182,7 @@ void CallDecl_class::check() {
     Variables params = getVariables();
     for (int i = params->first(); params->more(i); i = params->next(i)) {
         Variable param = params->nth(i);
-        if (semant_debug) cout << "---CallDecl_class---param_name---" << param->getName() << endl;
+        if (semant_debug) cout << "---CallDecl_class---param_name---" << param->getName()->get_string() << endl;
         bool flag1 = true, flag2 = true;
         if (param->getType() == Void) {
             semant_error(this) << "Function " << getName()->get_string() << " 's parameter has an invalid type Void.\n";
@@ -215,9 +215,10 @@ void StmtBlock_class::check(Symbol type) {
     if (semant_debug) cout << "---StmtBlock_class::check---" << endl;
     objectEnv.enterscope();
     VariableDecls localVarDecls = getVariableDecls();
+    if (semant_debug) cout << "---StmtBlock_class::check---localVarDecl->getName()---" << " ";
     for (int i = localVarDecls->first(); localVarDecls->more(i); i = localVarDecls->next(i)) {
         VariableDecl localVarDecl = localVarDecls->nth(i);
-        if (semant_debug) cout << "---StmtBlock_class::check---localVarDecl->getName()---" << localVarDecl->getName() << " ";
+        if (semant_debug) cout << localVarDecl->getName()->get_string() << " ";
         localVarDecl->check();
     }
     if (semant_debug) cout << endl;
@@ -246,7 +247,7 @@ void WhileStmt_class::check(Symbol type) {
     if (semant_debug) cout << "---WhileStmt_class---" << endl;
 
     inloops.push_back(true);
-    if (semant_debug) cout << "while add inloop ,remaining " << inloops.size() << endl;
+    if (semant_debug) cout << "while push inloop ,remaining " << inloops.size() << endl;
     Symbol conType = getCondition()->checkType();
     if (!sameType(conType, Bool))
         semant_error(this) << "Condition must be a Bool, got " << conType->get_string() << ".\n";
@@ -259,18 +260,18 @@ void ForStmt_class::check(Symbol type) {
     if (semant_debug) cout << "---ForStmt_class---" << endl;
 
     inloops.push_back(true);
-    if (semant_debug) cout << "for add inloop ,remaining " << inloops.size() << endl;
+    if (semant_debug) cout << "for push inloop ,remaining " << inloops.size() << endl;
     if (!getInit()->is_empty_Expr()) {
         getInit()->checkType();
+    }
+    if (!getLoop()->is_empty_Expr()) {
+        getLoop()->checkType();
     }
     if (!getCondition()->is_empty_Expr()) {
         Symbol conType = getCondition()->checkType();
         if (!sameType(conType, Bool)) {
             semant_error(this) << "Condition must be a Bool, got " << conType->get_string() << ".\n";
         }
-    }
-    if (!getLoop()->is_empty_Expr()) {
-        getLoop()->checkType();
     }
     getBody()->check(type);
     inloops.pop_back();
@@ -301,35 +302,35 @@ void BreakStmt_class::check(Symbol type) {
 }
 
 Symbol Call_class::checkType(){
-    if (semant_debug) cout << "---Call_class---" << name << endl;
+    if (semant_debug) cout << "---Call_class---" << getName()->get_string() << endl;
 
-    if (callTable.find(name) == callTable.end()){
-        if (strcmp(name->get_string(), print->get_string())==0) {
-            if (!sameType(actuals->nth(0)->checkType(), String)){
-                semant_error(this) << "the first of print should be string." << endl;
+    if (callTable.find(getName()) == callTable.end()){
+        if (strcmp(getName()->get_string(), print->get_string())==0) {
+            if (!sameType(getActuals()->nth(0)->checkType(), String)){
+                semant_error(this) << "printf()'s first parameter must be of type String.\n";
             }
             setType(Void);
             return Void;
         }
-        semant_error(this) << "noname" <<endl;
+        semant_error(this) << "Function " << getName()->get_string() << " has not been defined.\n";
         setType(Void);
         return Void;
     }
 
-    Variables variables1 = callTable[name]->getVariables();
-    Actuals actuals1 = actuals;
+    Variables variables1 = callTable[getName()]->getVariables();
+    Actuals actuals1 = getActuals();
     if (variables1->len() != actuals1->len()) {
-        semant_error(this) << "Function " << name << " called with wrong number of arguments.\n";
-        setType(callTable[name]->getType());
-        return callTable[name]->getType();
+        semant_error(this) << "Function " << getName()->get_string() << " called with wrong number of arguments.\n";
+        setType(callTable[getName()]->getType());
+        return callTable[getName()]->getType();
     }
     for (int i = variables1->first(); variables1->more(i); i = variables1->next(i)) {
         if (variables1->nth(i)->getType() != actuals1->nth(i)->checkType())
-            semant_error(this) << "Function " << name << " , the " << i << " parameter should be " << variables1->nth(i)->getType() << " but provided a " << actuals1->nth(i)->getType() << ".\n";
+            semant_error(this) << "Function " << getName()->get_string()<< " , the " << i << " parameter should be " << variables1->nth(i)->getType()->get_string() << " but provided a " << actuals1->nth(i)->getType()->get_string() << ".\n";
     }
-    if (semant_debug) cout << "---callTable[name]->getType():" << callTable[name]->getType()->get_string() << endl;
-    setType(callTable[name]->getType());
-    return callTable[name]->getType();
+    if (semant_debug) cout << "---callTable[name]->getType():" << callTable[getName()]->getType()->get_string() << endl;
+    setType(callTable[getName()]->getType());
+    return callTable[getName()]->getType();
 }
 
 Symbol Actual_class::checkType(){
@@ -353,7 +354,7 @@ Symbol Assign_class::checkType(){ // expr
     if (!sameType(expectedType, actualType)) {
         semant_error(this) << "Right value must have type " << expectedType->get_string() << " , got " << actualType->get_string() << ".\n";
     }
-    if (sameType(expectedType, String) && false) {
+    if (sameType(expectedType, String)) {
         semant_error(this) << "Left value can not be String.\n";
     }
     setType(expectedType);
@@ -748,10 +749,10 @@ Symbol Const_bool_class::checkType(){
 }
 
 Symbol Object_class::checkType(){
-    if (semant_debug) cout << "---Object_class---" << var << endl;
+    if (semant_debug) cout << "---Object_class---" << var->get_string() << endl;
 
     if (!objectEnv.lookup(var)) {
-        semant_error(this) << "object " << var << " has not been defined.\n";
+        semant_error(this) << "object " << var->get_string() << " has not been defined.\n";
         setType(Void);
         return Void;
     }
@@ -773,7 +774,7 @@ void Program_class::semant() {
     check_main();
     objectEnv.enterscope();
     install_globalVars(decls);
-    check_calls(decls);
+    check_calls();
     objectEnv.exitscope();
 
     if (semant_errors > 0) {
